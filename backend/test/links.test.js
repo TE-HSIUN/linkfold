@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { describe, test } from 'node:test';
+import { after, describe, test } from 'node:test';
 
 import express from 'express';
 import request from 'supertest';
@@ -16,6 +17,8 @@ const { default: prisma } = await import('../src/lib/prisma.js');
 const { verifyPassword } = await import('../src/lib/password.js');
 const { createLinksRouter } = await import('../src/routes/links.js');
 
+const testRunId = randomUUID();
+const createdShortCodes = new Set();
 const SUCCESS_RESPONSE_FIELDS = [
   'createdAt',
   'note',
@@ -24,6 +27,20 @@ const SUCCESS_RESPONSE_FIELDS = [
   'shortCode',
   'shortUrl',
 ];
+
+function testUrl(path, protocol = 'https') {
+  return `${protocol}://example.com/linkfold-test/${testRunId}/${path}`;
+}
+
+after(async () => {
+  await prisma.link.deleteMany({
+    where: {
+      shortCode: {
+        in: [...createdShortCodes],
+      },
+    },
+  });
+});
 
 async function assertRejectedWithoutWrite(body, errorCode) {
   const countBefore = await prisma.link.count();
@@ -37,6 +54,7 @@ async function assertRejectedWithoutWrite(body, errorCode) {
 
 function assertSuccessfulResponse(response, expected) {
   assert.equal(response.status, 201);
+  createdShortCodes.add(response.body.shortCode);
   assert.deepEqual(Object.keys(response.body).sort(), SUCCESS_RESPONSE_FIELDS);
   assert.match(response.body.shortCode, /^[0-9A-Za-z]{7}$/);
   assert.equal(
@@ -81,7 +99,7 @@ function createInjectedApp(router) {
 
 describe('POST /api/links', () => {
   test('以合法網址建立未受保護的短網址', async () => {
-    const originalUrl = 'https://example.com/a/very/long/path';
+    const originalUrl = testUrl('a/very/long/path');
     const response = await request(app)
       .post('/api/links')
       .send({ originalUrl });
@@ -94,7 +112,7 @@ describe('POST /api/links', () => {
   });
 
   test('選填備註與密碼會安全儲存', async () => {
-    const originalUrl = 'https://example.com/private';
+    const originalUrl = testUrl('private');
     const password = 'correct-horse';
     const response = await request(app).post('/api/links').send({
       originalUrl,
@@ -118,7 +136,7 @@ describe('POST /api/links', () => {
   });
 
   test('同一網址分開建立時得到不同短碼', async () => {
-    const originalUrl = 'https://example.com/docs';
+    const originalUrl = testUrl('docs');
     const [firstResponse, secondResponse] = await Promise.all([
       request(app).post('/api/links').send({ originalUrl }),
       request(app).post('/api/links').send({ originalUrl }),
@@ -126,6 +144,8 @@ describe('POST /api/links', () => {
 
     assert.equal(firstResponse.status, 201);
     assert.equal(secondResponse.status, 201);
+    createdShortCodes.add(firstResponse.body.shortCode);
+    createdShortCodes.add(secondResponse.body.shortCode);
     assert.notEqual(
       firstResponse.body.shortCode,
       secondResponse.body.shortCode,
@@ -148,7 +168,7 @@ describe('POST /api/links', () => {
     }
 
     test('接受 http 網址', async () => {
-      const originalUrl = 'http://example.com';
+      const originalUrl = testUrl('http-url', 'http');
       const response = await request(app)
         .post('/api/links')
         .send({ originalUrl });
@@ -163,7 +183,7 @@ describe('POST /api/links', () => {
 
   describe('note 驗證', () => {
     test('接受空字串備註', async () => {
-      const originalUrl = 'https://example.com/empty-note';
+      const originalUrl = testUrl('empty-note');
       const response = await request(app)
         .post('/api/links')
         .send({ originalUrl, note: '' });
@@ -176,7 +196,7 @@ describe('POST /api/links', () => {
     });
 
     test('接受 500 字元備註', async () => {
-      const originalUrl = 'https://example.com/500-character-note';
+      const originalUrl = testUrl('500-character-note');
       const note = '備'.repeat(500);
       const response = await request(app)
         .post('/api/links')
@@ -192,7 +212,7 @@ describe('POST /api/links', () => {
     test('拒絕 501 字元備註', async () => {
       await assertRejectedWithoutWrite(
         {
-          originalUrl: 'https://example.com/501-character-note',
+          originalUrl: testUrl('501-character-note'),
           note: '備'.repeat(501),
         },
         'INVALID_NOTE',
@@ -202,7 +222,7 @@ describe('POST /api/links', () => {
     test('拒絕非字串備註', async () => {
       await assertRejectedWithoutWrite(
         {
-          originalUrl: 'https://example.com/non-string-note',
+          originalUrl: testUrl('non-string-note'),
           note: 42,
         },
         'INVALID_NOTE',
@@ -212,7 +232,7 @@ describe('POST /api/links', () => {
 
   describe('password 驗證', () => {
     test('接受 8 字元密碼', async () => {
-      const originalUrl = 'https://example.com/8-character-password';
+      const originalUrl = testUrl('8-character-password');
       const response = await request(app)
         .post('/api/links')
         .send({ originalUrl, password: '12345678' });
@@ -225,7 +245,7 @@ describe('POST /api/links', () => {
     });
 
     test('接受 128 字元密碼', async () => {
-      const originalUrl = 'https://example.com/128-character-password';
+      const originalUrl = testUrl('128-character-password');
       const response = await request(app)
         .post('/api/links')
         .send({ originalUrl, password: 'p'.repeat(128) });
@@ -240,7 +260,7 @@ describe('POST /api/links', () => {
     test('拒絕 7 字元密碼', async () => {
       await assertRejectedWithoutWrite(
         {
-          originalUrl: 'https://example.com/7-character-password',
+          originalUrl: testUrl('7-character-password'),
           password: '1234567',
         },
         'INVALID_PASSWORD',
@@ -250,7 +270,7 @@ describe('POST /api/links', () => {
     test('拒絕 129 字元密碼', async () => {
       await assertRejectedWithoutWrite(
         {
-          originalUrl: 'https://example.com/129-character-password',
+          originalUrl: testUrl('129-character-password'),
           password: 'p'.repeat(129),
         },
         'INVALID_PASSWORD',
@@ -260,7 +280,7 @@ describe('POST /api/links', () => {
     test('拒絕 null 密碼', async () => {
       await assertRejectedWithoutWrite(
         {
-          originalUrl: 'https://example.com/null-password',
+          originalUrl: testUrl('null-password'),
           password: null,
         },
         'INVALID_PASSWORD',
@@ -297,7 +317,7 @@ describe('POST /api/links', () => {
       });
       const response = await request(createInjectedApp(router))
         .post('/api/links')
-        .send({ originalUrl: 'https://example.com/collision' });
+        .send({ originalUrl: testUrl('collision') });
 
       assert.equal(response.status, 201);
       assert.equal(response.body.shortCode, 'BBBBBBB');
@@ -322,7 +342,7 @@ describe('POST /api/links', () => {
       });
       const response = await request(createInjectedApp(router))
         .post('/api/links')
-        .send({ originalUrl: 'https://example.com/persistent-collision' });
+        .send({ originalUrl: testUrl('persistent-collision') });
 
       assert.equal(response.status, 500);
       assert.equal(response.body.error.code, 'INTERNAL_ERROR');

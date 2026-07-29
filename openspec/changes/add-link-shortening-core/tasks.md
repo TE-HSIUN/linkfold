@@ -29,11 +29,11 @@
 
 ## 6. 短碼轉址
 
-- [ ] 6.1 先寫測試：`backend/test/redirect.test.js` 覆蓋 Redirect a short code to its original URL、Require a password before redirecting protected links（GET 密碼頁、正確 POST 302、錯誤／缺少密碼 POST 401、再次 GET 仍要求密碼且頁面不洩漏備註或原始網址）、Unknown short codes return not found（GET 與 unlock POST 皆 404），以及 Redirect route does not shadow reserved paths。驗證：執行 `npm test -- test/redirect.test.js`，測試因轉址與密碼頁路由尚未完成而失敗（TDD 紅燈）。
-- [ ] 6.2 依 design 的「轉址路由註冊在最後，避免遮蔽既有路徑」，在 `backend/src/routes/redirect.js` 實作未受保護的 `GET /:code`，並於 `app.js` 中最後註冊轉址 router；查到無密碼 Link 回 302，查無資料回 404，Report service health 與 API 路徑仍由既有 route 處理。驗證：執行 `npm test -- test/redirect.test.js`，未受保護轉址、404、`/health` 與 `/api/links` 案例轉綠。
-- [ ] 6.3 依 design 的「受保護連結使用伺服器產生的密碼頁」，讓 `GET /:code` 對有 `passwordHash` 的 Link 回 200 HTML 表單，並實作 `POST /:code/unlock` 以 bcrypt 比對密碼；正確回 302，錯誤或缺少回 401 表單，未知短碼回 404，所有 HTML 都不含備註、原始網址或雜湊，且不建立 session。驗證：執行 `npm test -- test/redirect.test.js`，Require a password before redirecting protected links 的全部案例轉綠。
+- [x] 6.1 先寫測試：`backend/test/redirect.test.js` 覆蓋 Redirect a short code to its original URL、Require a password before redirecting protected links（GET 密碼頁、正確 POST 302、錯誤／缺少密碼 POST 401、再次 GET 仍要求密碼且頁面不洩漏備註或原始網址）、Unknown short codes return not found（GET 與 unlock POST 皆 404），以及 Redirect route does not shadow reserved paths。驗證：執行 `npm test -- test/redirect.test.js`，測試因轉址與密碼頁路由尚未完成而失敗（TDD 紅燈）。
+- [x] 6.2 依 design 的「轉址路由註冊在最後，避免遮蔽既有路徑」，在 `backend/src/routes/redirect.js` 實作未受保護的 `GET /:code`，並於 `app.js` 中最後註冊轉址 router；查到無密碼 Link 回 302，查無資料回 404，Report service health 與 API 路徑仍由既有 route 處理。驗證：執行 `npm test -- test/redirect.test.js`，未受保護轉址、404、`/health` 與 `/api/links` 案例轉綠。
+- [x] 6.3 依 design 的「受保護連結使用伺服器產生的密碼頁」，讓 `GET /:code` 對有 `passwordHash` 的 Link 回 200 HTML 表單，並實作 `POST /:code/unlock` 以 bcrypt 比對密碼；正確回 302，錯誤或缺少回 401 表單，未知短碼回 404，所有 HTML 都不含備註、原始網址或雜湊，且不建立 session。驗證：執行 `npm test -- test/redirect.test.js`，Require a password before redirecting protected links 的全部案例轉綠。
 
 ## 7. 端到端驗證與收尾
 
-- [ ] 7.1 讓整合測試可重複執行且不留殘留資料：`links.test.js` 與 `redirect.test.js` 在 `after` 鉤子刪除自己建立的未受保護及受保護 Link，並以隨機網址避免測試間互相影響。驗證：連續執行 `npm test` 兩次皆全綠，且事後 `docker compose exec db psql -U postgres -c 'select count(*) from "Link"'` 的筆數與測試前相同。
-- [ ] 7.2 撰寫 `backend/README.md` 記錄啟動步驟（複製 `.env.example`、`docker compose up -d`、套用兩支 Prisma migrations、`npm run dev`、`npm test`）及選填欄位限制，並從乾淨狀態驗證兩條流程：無密碼短網址直接 302；含備註與密碼的短網址 GET 回密碼頁、錯誤密碼回 401、正確密碼回 302，且頁面與 API 不洩漏密碼雜湊。驗證：依 README 的 curl 指令逐項取得預期狀態與 `Location`，再執行 `npm test` 全綠。
+- [x] 7.1 讓整合測試可重複執行且不留殘留資料：`links.test.js` 與 `redirect.test.js` 在 `after` 鉤子刪除自己建立的未受保護及受保護 Link，並以隨機網址避免測試間互相影響。驗證：連續執行 `npm test` 兩次皆全綠，且事後 `docker compose exec db psql -U postgres -c 'select count(*) from "Link"'` 的筆數與測試前相同。
+- [x] 7.2 撰寫 `backend/README.md` 記錄啟動步驟（複製 `.env.example`、`docker compose up -d`、套用兩支 Prisma migrations、`npm run dev`、`npm test`）及選填欄位限制，並從乾淨狀態驗證兩條流程：無密碼短網址直接 302；含備註與密碼的短網址 GET 回密碼頁、錯誤密碼回 401、正確密碼回 302，且頁面與 API 不洩漏密碼雜湊。驗證：依 README 的 curl 指令逐項取得預期狀態與 `Location`，再執行 `npm test` 全綠。

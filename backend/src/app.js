@@ -1,11 +1,13 @@
 import express from 'express';
 
 import linksRouter from './routes/links.js';
+import redirectRouter from './routes/redirect.js';
 
 const app = express();
 
 // 解析 JSON 請求主體
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 
 // 健康檢查
 // 注意：轉址路由 GET /:code 是萬用路由，會匹配任何單層路徑，
@@ -15,6 +17,9 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/api/links', linksRouter);
+
+// 萬用短碼路由必須放在所有具名路由之後。
+app.use(redirectRouter);
 
 app.use((error, req, res, next) => {
   if (res.headersSent) {
