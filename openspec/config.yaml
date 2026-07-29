@@ -9,6 +9,24 @@ schema: spec-driven
 #     We use conventional commits
 #     Domain: e-commerce platform
 
+context: |
+  領域：Linkfold 是一個縮網址服務。使用者貼上原始網址，系統產生短碼，
+  訪客造訪短網址時轉址到原始網址，並記錄點擊次數。
+
+  技術棧：
+  - 前端：Vue 3 + Vite、Tailwind CSS、Vue Router、Axios
+  - 後端：Node.js + Express（ESM，package.json 已設 "type": "module"）
+  - 資料庫：PostgreSQL，透過 Prisma 管理 Schema 與 Migration
+  - 部署：GCP Compute Engine（Ubuntu 24.04 LTS）、Docker + Docker Compose，
+    Nginx 提供前端靜態檔、反向代理 API、處理網域與 HTTPS
+  - 版本控制：Git / GitHub
+
+  專案結構：backend/ 為 Express 後端；前端之後放在 frontend/。
+
+  慣例：
+  - 使用繁體中文（台灣）撰寫文件、註解與 commit message
+  - commit message 使用 conventional commits
+
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.
 # Example:
