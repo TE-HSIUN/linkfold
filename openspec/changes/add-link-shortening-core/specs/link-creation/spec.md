@@ -2,20 +2,25 @@
 
 ### Requirement: Create a short link from an original URL
 
-The system SHALL expose `POST /api/links`, which accepts a JSON body containing an `originalUrl` field, generates a unique short code for it, persists the pair, and returns the short code together with the full short URL.
+The system SHALL expose `POST /api/links`, which accepts a JSON body containing an `originalUrl` field and optional `note` and `password` fields, generates a unique short code, and persists the link. When `password` is present, the system SHALL first transform its UTF-8 bytes with SHA-256 and Base64 encoding, then store only a bcrypt hash produced from that fixed-length value with cost factor 12. The system SHALL NOT persist the plaintext password or intermediate digest.
 
-The response status SHALL be `201 Created` and the response body SHALL contain `shortCode`, `shortUrl`, `originalUrl`, and `createdAt`. The `shortUrl` SHALL be the configured base URL joined with the generated short code.
+The response status SHALL be `201 Created` and the response body SHALL contain `shortCode`, `shortUrl`, `originalUrl`, `note`, `passwordProtected`, and `createdAt`. The `shortUrl` SHALL be the configured base URL joined with the generated short code. The response SHALL NOT contain `password` or `passwordHash`.
 
 #### Scenario: Valid URL is shortened
 
 - **WHEN** a client sends `POST /api/links` with body `{"originalUrl": "https://example.com/a/very/long/path"}`
-- **THEN** the system responds `201` with a body whose `originalUrl` equals the submitted URL, whose `shortCode` is a 7-character alphanumeric string, and whose `shortUrl` ends with that short code
+- **THEN** the system responds `201` with a body whose `originalUrl` equals the submitted URL, whose `shortCode` is a 7-character alphanumeric string, whose `shortUrl` ends with that short code, whose `note` is null, and whose `passwordProtected` is false
 
 ##### Example: successful creation
 
 - **GIVEN** the configured base URL is `http://localhost:3000`
 - **WHEN** the client submits `{"originalUrl": "https://example.com/docs"}`
-- **THEN** the response is `201` with `shortCode` = `aB3xY9z`, `shortUrl` = `http://localhost:3000/aB3xY9z`, `originalUrl` = `https://example.com/docs`, and a `createdAt` ISO-8601 timestamp
+- **THEN** the response is `201` with `shortCode` = `aB3xY9z`, `shortUrl` = `http://localhost:3000/aB3xY9z`, `originalUrl` = `https://example.com/docs`, `note` = null, `passwordProtected` = false, and a `createdAt` ISO-8601 timestamp
+
+#### Scenario: Optional note and password are stored safely
+
+- **WHEN** a client submits `{"originalUrl":"https://example.com/private","note":"Project draft","password":"correct-horse"}` to `POST /api/links`
+- **THEN** the system persists the note and a SHA-256-preprocessed bcrypt cost-12 hash that the password helper verifies for `correct-horse`, responds `201` with `note` = `Project draft` and `passwordProtected` = true, and omits `password`, the intermediate digest, and `passwordHash` from the response
 
 #### Scenario: Each request produces a distinct short code
 
@@ -41,6 +46,30 @@ The system SHALL validate `originalUrl` before persisting it. The value MUST be 
 | `{"originalUrl": "javascript:alert(1)"}` | 400 | INVALID_URL | disallowed scheme |
 | `{"originalUrl": 42}` | 400 | INVALID_URL | not a string |
 | `{"originalUrl": "http://example.com"}` | 201 | — | accepted |
+
+### Requirement: Validate optional note and password
+
+When `note` is present, it MUST be a string no longer than 500 characters. When `password` is present, it MUST be a string between 8 and 128 characters inclusive. An omitted field SHALL mean the corresponding option is not configured. Invalid optional fields SHALL produce status `400` and SHALL NOT persist a record.
+
+#### Scenario: Invalid optional input is rejected
+
+- **WHEN** a client sends `POST /api/links` with a non-string or over-500-character `note`, or with a non-string password or a password outside the inclusive 8–128 character range
+- **THEN** the system responds `400` with `error.code` = `INVALID_NOTE` for an invalid note or `INVALID_PASSWORD` for an invalid password, and no record is written to storage
+
+##### Example: optional field boundaries
+
+| Request addition | Expected status | error.code | Notes |
+| ---------------- | --------------- | ---------- | ----- |
+| no `note` and no `password` | 201 | — | both options omitted |
+| `"note": ""` | 201 | — | empty note is a valid string |
+| `"note"` with 500 characters | 201 | — | maximum note length |
+| `"note"` with 501 characters | 400 | INVALID_NOTE | note too long |
+| `"note": 42` | 400 | INVALID_NOTE | note is not a string |
+| `"password": "12345678"` | 201 | — | minimum password length |
+| `"password"` with 128 characters | 201 | — | maximum password length |
+| `"password": "1234567"` | 400 | INVALID_PASSWORD | password too short |
+| `"password"` with 129 characters | 400 | INVALID_PASSWORD | password too long |
+| `"password": null` | 400 | INVALID_PASSWORD | password is not a string |
 
 ### Requirement: Short codes are unique and randomly generated
 

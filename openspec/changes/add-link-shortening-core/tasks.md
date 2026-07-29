@@ -9,27 +9,31 @@
 
 ## 3. Link 資料模型與第一支 migration
 
-- [ ] 3.1 依 design 的「資料模型：Link 資料表」在 `backend/prisma/schema.prisma` 定義 `Link` 模型（`id` 自增主鍵、`shortCode` 唯一字串、`originalUrl` 字串、`createdAt` 預設 `now()`），並產生第一支 migration。完成後資料庫具備儲存短網址所需的結構與唯一性保證。驗證：執行 `npx prisma migrate dev --name init_link`，再以 `docker compose exec db psql -U postgres -c '\d "Link"'` 確認四個欄位存在且 `shortCode` 有唯一索引。
-- [ ] 3.2 建立 Prisma client 單例 `backend/src/lib/prisma.js` 並匯出，讓路由與測試共用同一個連線池而非各自建立。完成後應用程式可對 `Link` 資料表讀寫。驗證：執行 `node --input-type=module -e "import p from './src/lib/prisma.js'; console.log(await p.link.count())"`，輸出 `0` 且無連線錯誤。
+- [x] 3.1 依 design 的「資料模型：Link 資料表」在 `backend/prisma/schema.prisma` 定義 `Link` 模型（`id` 自增主鍵、`shortCode` 唯一字串、`originalUrl` 字串、`createdAt` 預設 `now()`），並產生第一支 migration。完成後資料庫具備儲存短網址所需的結構與唯一性保證。驗證：執行 `npx prisma migrate dev --name init_link`，再以 `docker compose exec db psql -U postgres -c '\d "Link"'` 確認四個欄位存在且 `shortCode` 有唯一索引。
+- [x] 3.2 建立 Prisma client 單例 `backend/src/lib/prisma.js` 並匯出，讓路由與測試共用同一個連線池而非各自建立。完成後應用程式可對 `Link` 資料表讀寫。驗證：執行 `node --input-type=module -e "import p from './src/lib/prisma.js'; console.log(await p.link.count())"`，輸出 `0` 且無連線錯誤。
+- [x] 3.3 延伸 design 的「資料模型：Link 資料表」，在 `backend/prisma/schema.prisma` 為 `Link` 加入 nullable `note` 與 nullable `passwordHash`，並建立 `add_link_note_password_hash` 第二支 migration，不修改已完成的 `init_link` migration。完成後既有資料列可在無回填下升級，且新資料可選填備註與密碼雜湊。驗證：執行 `npx prisma migrate dev --name add_link_note_password_hash`，再以 `docker compose exec db psql -U postgres -c '\d "Link"'` 確認兩欄允許 NULL。
 
 ## 4. 測試框架與短碼產生器
 
-- [ ] 4.1 依 design 的「測試策略：node:test 搭配 supertest」導入測試：安裝 `supertest` 為開發相依，並將 `backend/package.json` 的 `test` script 由錯誤佔位改為 `node --test`。完成後 `npm test` 是一個真正會執行測試並回報結果的指令。驗證：於 `backend/` 執行 `npm test`，輸出為測試執行摘要而非 `Error: no test specified`。
+- [ ] 4.1 依 design 的「測試策略：node:test 搭配 supertest」導入測試：安裝 `supertest` 為開發相依、`bcrypt` 為執行期相依，並將 `backend/package.json` 的 `test` script 由錯誤佔位改為 `node --test`。完成後 `npm test` 是一個真正會執行測試並回報結果的指令，且後端具備密碼雜湊能力。驗證：於 `backend/` 執行 `npm test`，輸出為測試執行摘要而非 `Error: no test specified`，且 `npm ls bcrypt supertest` 無 missing dependency。
 - [ ] 4.2 先寫測試：`backend/test/short-code.test.js` 覆蓋 Short codes are unique and randomly generated 的三個情境——回傳長度為 7、字元僅來自 `0-9A-Za-z`、連續產生 1000 次無重複。完成後短碼產生器的契約已被測試釘住。驗證：執行 `npm test`，該檔因產生器尚未實作而失敗（TDD 紅燈）。
 - [ ] 4.3 依 design 的「以 node:crypto 自行實作短碼產生器，不引入 nanoid」，在 `backend/src/lib/short-code.js` 實作並匯出 `generateShortCode(length = 7)`，以 `crypto.randomInt` 從 62 字元字母表取值。完成後可穩定產生符合契約的短碼。驗證：執行 `npm test`，4.2 的三個測試全部轉綠。
+- [ ] 4.4 先寫 `backend/test/password.test.js`，覆蓋 design 的「密碼使用 bcrypt cost 12 雜湊後保存」：雜湊不等於原文、bcrypt cost 為 12、正確密碼比對成功、錯誤密碼比對失敗，且前 72 bytes 相同但尾端不同的長密碼不可互相通過。完成後密碼 helper 的安全契約已被測試釘住。驗證：執行 `npm test -- test/password.test.js`，測試因 helper 尚未存在而失敗（TDD 紅燈）。
+- [ ] 4.5 在 `backend/src/lib/password.js` 實作集中式密碼 helper：先將 UTF-8 密碼做 SHA-256 並轉為 Base64，再以 bcrypt cost 12 雜湊或比對，讓完整 8–128 字元輸入都參與驗證，且建立與解鎖路由不直接處理密碼細節。完成後 helper 不輸出或記錄原始密碼、中間摘要及雜湊。驗證：執行 `npm test -- test/password.test.js`，4.4 的測試全部轉綠。
 
 ## 5. 建立短網址 API
 
-- [ ] 5.1 先寫測試：`backend/test/links.test.js` 以 supertest 覆蓋 Create a short link from an original URL（合法網址回 201、`shortCode` 為 7 碼、`shortUrl` 以短碼結尾、同一網址兩次請求得到不同短碼）與 Reject invalid original URLs（缺欄位、空字串、`not-a-url`、`javascript:alert(1)`、非字串各回 400 且 `error.code` 為 `INVALID_URL`）。驗證：執行 `npm test`，該檔因路由尚未存在而失敗（TDD 紅燈）。
-- [ ] 5.2 依 design 的「網址驗證使用 WHATWG URL 並限定 http/https」，在 `backend/src/routes/links.js` 加入輸入驗證，並在 `app.js` 註冊統一的 Express 錯誤處理中介層，使所有錯誤回應為 `{"error":{"code","message"}}` 形狀。完成後不合法的網址一律被擋在寫入資料庫之前。驗證：執行 `npm test`，`links.test.js` 中所有 400 案例轉綠，且資料庫 `Link` 筆數未因這些請求增加。
-- [ ] 5.3 依 design 的「短碼唯一性靠資料庫唯一約束加重試」完成 `POST /api/links`：產生短碼後寫入，遇 Prisma `P2002` 唯一約束衝突則重新產生並重試，最多 5 次，全數失敗回 500 `INTERNAL_ERROR`；成功時回 201 與 `shortCode`、`shortUrl`、`originalUrl`、`createdAt`。驗證：執行 `npm test`，`links.test.js` 全綠。
+- [ ] 5.1 先寫測試：`backend/test/links.test.js` 以 supertest 覆蓋 Create a short link from an original URL（有／無選填欄位皆回 201、`shortCode` 為 7 碼、`shortUrl` 以短碼結尾、同一網址兩次得到不同短碼）、Reject invalid original URLs，以及 Validate optional note and password 的 500/501 字元備註與 8/128/129 字元密碼邊界；成功回應只含 `note` 與 `passwordProtected`，不含密碼或雜湊。驗證：執行 `npm test -- test/links.test.js`，測試因路由尚未支援完整契約而失敗（TDD 紅燈）。
+- [ ] 5.2 依 design 的「網址驗證使用 WHATWG URL 並限定 http/https」在 `backend/src/routes/links.js` 驗證網址，並驗證選填 `note` 是不超過 500 字元的字串、選填 `password` 是 8–128 字元的字串；在 `app.js` 註冊統一錯誤處理，使失敗分別回 `INVALID_URL`、`INVALID_NOTE`、`INVALID_PASSWORD` 的 400 JSON。完成後所有不合法輸入都在寫入前被拒絕。驗證：執行 `npm test -- test/links.test.js`，所有 400 案例轉綠且資料庫筆數不增加。
+- [ ] 5.3 依 design 的「短碼唯一性靠資料庫唯一約束加重試」與「密碼使用 bcrypt cost 12 雜湊後保存」完成 `POST /api/links`：選填密碼先雜湊再寫入，短碼遇 Prisma `P2002` 最多重試 5 次；成功時回 201 與 `shortCode`、`shortUrl`、`originalUrl`、`note`、`passwordProtected`、`createdAt`，且不回傳密碼或 `passwordHash`。驗證：執行 `npm test -- test/links.test.js`，建立、雜湊、碰撞重試與回應資料形狀全部轉綠。
 
 ## 6. 短碼轉址
 
-- [ ] 6.1 先寫測試：`backend/test/redirect.test.js` 覆蓋 Redirect a short code to its original URL（先建立再造訪，回 302 且 `Location` 等於原始網址）、Unknown short codes return not found（造訪 `/zzzzzzz` 回 404 且 `error.code` 為 `NOT_FOUND`）、Redirect route does not shadow reserved paths（`GET /health` 仍回 200）。驗證：執行 `npm test`，該檔因轉址路由尚未存在而失敗（TDD 紅燈）。
-- [ ] 6.2 依 design 的「轉址路由註冊在最後，避免遮蔽既有路徑」，在 `backend/src/routes/redirect.js` 實作 `GET /:code` 並於 `app.js` 中最後註冊：查到資料回 302 並帶 `Location`，查無資料回 404。完成後短網址可在瀏覽器實際跳轉。驗證：執行 `npm test`，`redirect.test.js` 全綠且 `/health` 測試仍為 200。
+- [ ] 6.1 先寫測試：`backend/test/redirect.test.js` 覆蓋 Redirect a short code to its original URL、Require a password before redirecting protected links（GET 密碼頁、正確 POST 302、錯誤／缺少密碼 POST 401、再次 GET 仍要求密碼且頁面不洩漏備註或原始網址）、Unknown short codes return not found（GET 與 unlock POST 皆 404），以及 Redirect route does not shadow reserved paths。驗證：執行 `npm test -- test/redirect.test.js`，測試因轉址與密碼頁路由尚未完成而失敗（TDD 紅燈）。
+- [ ] 6.2 依 design 的「轉址路由註冊在最後，避免遮蔽既有路徑」，在 `backend/src/routes/redirect.js` 實作未受保護的 `GET /:code`，並於 `app.js` 中最後註冊轉址 router；查到無密碼 Link 回 302，查無資料回 404，Report service health 與 API 路徑仍由既有 route 處理。驗證：執行 `npm test -- test/redirect.test.js`，未受保護轉址、404、`/health` 與 `/api/links` 案例轉綠。
+- [ ] 6.3 依 design 的「受保護連結使用伺服器產生的密碼頁」，讓 `GET /:code` 對有 `passwordHash` 的 Link 回 200 HTML 表單，並實作 `POST /:code/unlock` 以 bcrypt 比對密碼；正確回 302，錯誤或缺少回 401 表單，未知短碼回 404，所有 HTML 都不含備註、原始網址或雜湊，且不建立 session。驗證：執行 `npm test -- test/redirect.test.js`，Require a password before redirecting protected links 的全部案例轉綠。
 
 ## 7. 端到端驗證與收尾
 
-- [ ] 7.1 讓整合測試可重複執行且不留殘留資料：`links.test.js` 與 `redirect.test.js` 在 `after` 鉤子刪除自己建立的 `Link` 資料列，並以隨機網址避免測試間互相影響。驗證：連續執行 `npm test` 兩次皆全綠，且事後 `docker compose exec db psql -U postgres -c 'select count(*) from "Link"'` 的筆數與測試前相同。
-- [ ] 7.2 撰寫 `backend/README.md` 記錄啟動步驟（複製 `.env.example`、`docker compose up -d`、`npx prisma migrate dev`、`npm run dev`、`npm test`），並照著該步驟從乾淨狀態做一次手動端到端驗證。驗證：依 README 操作後，`curl -X POST localhost:3000/api/links -H 'content-type: application/json' -d '{"originalUrl":"https://example.com"}'` 回 201，`curl -I localhost:3000/<回傳的短碼>` 回 302 且 `Location` 為 `https://example.com`，`curl -i localhost:3000/zzzzzzz` 回 404。
+- [ ] 7.1 讓整合測試可重複執行且不留殘留資料：`links.test.js` 與 `redirect.test.js` 在 `after` 鉤子刪除自己建立的未受保護及受保護 Link，並以隨機網址避免測試間互相影響。驗證：連續執行 `npm test` 兩次皆全綠，且事後 `docker compose exec db psql -U postgres -c 'select count(*) from "Link"'` 的筆數與測試前相同。
+- [ ] 7.2 撰寫 `backend/README.md` 記錄啟動步驟（複製 `.env.example`、`docker compose up -d`、套用兩支 Prisma migrations、`npm run dev`、`npm test`）及選填欄位限制，並從乾淨狀態驗證兩條流程：無密碼短網址直接 302；含備註與密碼的短網址 GET 回密碼頁、錯誤密碼回 401、正確密碼回 302，且頁面與 API 不洩漏密碼雜湊。驗證：依 README 的 curl 指令逐項取得預期狀態與 `Location`，再執行 `npm test` 全綠。
