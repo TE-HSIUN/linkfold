@@ -23,9 +23,9 @@
 
 ## 5. 建立短網址 API
 
-- [ ] 5.1 先寫測試：`backend/test/links.test.js` 以 supertest 覆蓋 Create a short link from an original URL（有／無選填欄位皆回 201、`shortCode` 為 7 碼、`shortUrl` 以短碼結尾、同一網址兩次得到不同短碼）、Reject invalid original URLs，以及 Validate optional note and password 的 500/501 字元備註與 8/128/129 字元密碼邊界；成功回應只含 `note` 與 `passwordProtected`，不含密碼或雜湊。驗證：執行 `npm test -- test/links.test.js`，測試因路由尚未支援完整契約而失敗（TDD 紅燈）。
-- [ ] 5.2 依 design 的「網址驗證使用 WHATWG URL 並限定 http/https」在 `backend/src/routes/links.js` 驗證網址，並驗證選填 `note` 是不超過 500 字元的字串、選填 `password` 是 8–128 字元的字串；在 `app.js` 註冊統一錯誤處理，使失敗分別回 `INVALID_URL`、`INVALID_NOTE`、`INVALID_PASSWORD` 的 400 JSON。完成後所有不合法輸入都在寫入前被拒絕。驗證：執行 `npm test -- test/links.test.js`，所有 400 案例轉綠且資料庫筆數不增加。
-- [ ] 5.3 依 design 的「短碼唯一性靠資料庫唯一約束加重試」與「密碼使用 bcrypt cost 12 雜湊後保存」完成 `POST /api/links`：選填密碼先雜湊再寫入，短碼遇 Prisma `P2002` 最多重試 5 次；成功時回 201 與 `shortCode`、`shortUrl`、`originalUrl`、`note`、`passwordProtected`、`createdAt`，且不回傳密碼或 `passwordHash`。驗證：執行 `npm test -- test/links.test.js`，建立、雜湊、碰撞重試與回應資料形狀全部轉綠。
+- [x] 5.1 先寫測試：`backend/test/links.test.js` 以 supertest 覆蓋 Create a short link from an original URL（有／無選填欄位皆回 201、`shortCode` 為 7 碼、`shortUrl` 以短碼結尾、同一網址兩次得到不同短碼）、Reject invalid original URLs，以及 Validate optional note and password 的 500/501 字元備註與 8/128/129 字元密碼邊界；成功回應只含 `note` 與 `passwordProtected`，不含密碼或雜湊。驗證：執行 `npm test -- test/links.test.js`，測試因路由尚未支援完整契約而失敗（TDD 紅燈）。
+- [x] 5.2 依 design 的「網址驗證使用 WHATWG URL 並限定 http/https」在 `backend/src/routes/links.js` 驗證網址，並驗證選填 `note` 是不超過 500 字元的字串、選填 `password` 是 8–128 字元的字串；在 `app.js` 註冊統一錯誤處理，使失敗分別回 `INVALID_URL`、`INVALID_NOTE`、`INVALID_PASSWORD` 的 400 JSON。完成後所有不合法輸入都在寫入前被拒絕。驗證：執行 `npm test -- test/links.test.js`，所有 400 案例轉綠且資料庫筆數不增加。
+- [x] 5.3 依 design 的「短碼唯一性靠資料庫唯一約束加重試」與「密碼使用 bcrypt cost 12 雜湊後保存」完成 `POST /api/links`：選填密碼先雜湊再寫入，短碼遇 Prisma `P2002` 最多重試 5 次；成功時回 201 與 `shortCode`、`shortUrl`、`originalUrl`、`note`、`passwordProtected`、`createdAt`，且不回傳密碼或 `passwordHash`。驗證：執行 `npm test -- test/links.test.js`，建立、雜湊、碰撞重試與回應資料形狀全部轉綠。
 
 ## 6. 短碼轉址
 
