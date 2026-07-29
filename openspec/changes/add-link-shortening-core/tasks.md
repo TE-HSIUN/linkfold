@@ -4,8 +4,8 @@
 
 ## 2. 本機 PostgreSQL 與環境變數
 
-- [ ] 2.1 依 design 的「本機 PostgreSQL 以 Docker Compose 提供」，在專案根目錄新增 `docker-compose.yml`，定義 PostgreSQL 15 服務、對外映射 5432、以具名 volume 持久化資料。完成後開發者只需 Docker 即可取得可連線的資料庫。驗證：`docker compose up -d` 後 `docker compose ps` 顯示服務為 running，且 `docker compose exec db psql -U postgres -c "select 1"` 成功回應。
-- [ ] 2.2 建立環境變數契約：`backend/.env.example` 列出 `DATABASE_URL`、`PORT`、`BASE_URL` 三個變數與可直接使用的本機預設值，`.gitignore` 排除 `backend/.env`。完成後任何人複製 `.env.example` 成 `.env` 即可啟動，且真實憑證不會進版控。驗證：建立 `backend/.env` 後執行 `git status --short`，輸出不含 `backend/.env`。
+- [x] 2.1 依 design 的「本機 PostgreSQL 以 Docker Compose 提供」，在專案根目錄新增 `docker-compose.yml`，定義 PostgreSQL 15 服務、對外映射 5432、以具名 volume 持久化資料。完成後開發者只需 Docker 即可取得可連線的資料庫。驗證：`docker compose up -d` 後 `docker compose ps` 顯示服務為 running，且 `docker compose exec db psql -U postgres -c "select 1"` 成功回應。
+- [x] 2.2 建立環境變數契約：`backend/.env.example` 列出 `DATABASE_URL`、`PORT`、`BASE_URL` 三個變數與可直接使用的本機預設值，`.gitignore` 排除 `backend/.env`。完成後任何人複製 `.env.example` 成 `.env` 即可啟動，且真實憑證不會進版控。驗證：建立 `backend/.env` 後執行 `git status --short`，輸出不含 `backend/.env`。
 
 ## 3. Link 資料模型與第一支 migration
 
