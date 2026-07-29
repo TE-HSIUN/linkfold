@@ -15,11 +15,11 @@
 
 ## 4. 測試框架與短碼產生器
 
-- [ ] 4.1 依 design 的「測試策略：node:test 搭配 supertest」導入測試：安裝 `supertest` 為開發相依、`bcrypt` 為執行期相依，並將 `backend/package.json` 的 `test` script 由錯誤佔位改為 `node --test`。完成後 `npm test` 是一個真正會執行測試並回報結果的指令，且後端具備密碼雜湊能力。驗證：於 `backend/` 執行 `npm test`，輸出為測試執行摘要而非 `Error: no test specified`，且 `npm ls bcrypt supertest` 無 missing dependency。
-- [ ] 4.2 先寫測試：`backend/test/short-code.test.js` 覆蓋 Short codes are unique and randomly generated 的三個情境——回傳長度為 7、字元僅來自 `0-9A-Za-z`、連續產生 1000 次無重複。完成後短碼產生器的契約已被測試釘住。驗證：執行 `npm test`，該檔因產生器尚未實作而失敗（TDD 紅燈）。
-- [ ] 4.3 依 design 的「以 node:crypto 自行實作短碼產生器，不引入 nanoid」，在 `backend/src/lib/short-code.js` 實作並匯出 `generateShortCode(length = 7)`，以 `crypto.randomInt` 從 62 字元字母表取值。完成後可穩定產生符合契約的短碼。驗證：執行 `npm test`，4.2 的三個測試全部轉綠。
-- [ ] 4.4 先寫 `backend/test/password.test.js`，覆蓋 design 的「密碼使用 bcrypt cost 12 雜湊後保存」：雜湊不等於原文、bcrypt cost 為 12、正確密碼比對成功、錯誤密碼比對失敗，且前 72 bytes 相同但尾端不同的長密碼不可互相通過。完成後密碼 helper 的安全契約已被測試釘住。驗證：執行 `npm test -- test/password.test.js`，測試因 helper 尚未存在而失敗（TDD 紅燈）。
-- [ ] 4.5 在 `backend/src/lib/password.js` 實作集中式密碼 helper：先將 UTF-8 密碼做 SHA-256 並轉為 Base64，再以 bcrypt cost 12 雜湊或比對，讓完整 8–128 字元輸入都參與驗證，且建立與解鎖路由不直接處理密碼細節。完成後 helper 不輸出或記錄原始密碼、中間摘要及雜湊。驗證：執行 `npm test -- test/password.test.js`，4.4 的測試全部轉綠。
+- [x] 4.1 依 design 的「測試策略：node:test 搭配 supertest」導入測試：安裝 `supertest` 為開發相依、`bcrypt` 為執行期相依，並將 `backend/package.json` 的 `test` script 由錯誤佔位改為 `node --test`。完成後 `npm test` 是一個真正會執行測試並回報結果的指令，且後端具備密碼雜湊能力。驗證：於 `backend/` 執行 `npm test`，輸出為測試執行摘要而非 `Error: no test specified`，且 `npm ls bcrypt supertest` 無 missing dependency。
+- [x] 4.2 先寫測試：`backend/test/short-code.test.js` 覆蓋 Short codes are unique and randomly generated 的三個情境——回傳長度為 7、字元僅來自 `0-9A-Za-z`、連續產生 1000 次無重複。完成後短碼產生器的契約已被測試釘住。驗證：執行 `npm test`，該檔因產生器尚未實作而失敗（TDD 紅燈）。
+- [x] 4.3 依 design 的「以 node:crypto 自行實作短碼產生器，不引入 nanoid」，在 `backend/src/lib/short-code.js` 實作並匯出 `generateShortCode(length = 7)`，以 `crypto.randomInt` 從 62 字元字母表取值。完成後可穩定產生符合契約的短碼。驗證：執行 `npm test`，4.2 的三個測試全部轉綠。
+- [x] 4.4 先寫 `backend/test/password.test.js`，覆蓋 design 的「密碼使用 bcrypt cost 12 雜湊後保存」：雜湊不等於原文、bcrypt cost 為 12、正確密碼比對成功、錯誤密碼比對失敗，且前 72 bytes 相同但尾端不同的長密碼不可互相通過。完成後密碼 helper 的安全契約已被測試釘住。驗證：執行 `npm test -- test/password.test.js`，測試因 helper 尚未存在而失敗（TDD 紅燈）。
+- [x] 4.5 在 `backend/src/lib/password.js` 實作集中式密碼 helper：先將 UTF-8 密碼做 SHA-256 並轉為 Base64，再以 bcrypt cost 12 雜湊或比對，讓完整 8–128 字元輸入都參與驗證，且建立與解鎖路由不直接處理密碼細節。完成後 helper 不輸出或記錄原始密碼、中間摘要及雜湊。驗證：執行 `npm test -- test/password.test.js`，4.4 的測試全部轉綠。
 
 ## 5. 建立短網址 API
 
