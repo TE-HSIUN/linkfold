@@ -1,16 +1,18 @@
 # Linkfold 後端
 
-Linkfold 後端提供短網址建立、一般連結轉址，以及共享密碼保護功能。
+Linkfold 後端提供短網址建立、一般連結轉址、密碼保護解鎖，以及公開頁面
+metadata 擷取功能。
 
 ## 環境需求
 
-- Node.js
+- Node.js 22.18 以上
 - npm
-- Docker 與 Docker Compose
+- PostgreSQL 15
+- Docker 與 Docker Compose（未自行安裝 PostgreSQL 時使用）
 
 ## 啟動方式
 
-先在專案根目錄啟動 PostgreSQL：
+若使用專案提供的 Docker PostgreSQL，先在專案根目錄啟動資料庫：
 
 ```bash
 docker compose up -d
@@ -21,7 +23,7 @@ docker compose ps
 
 ```bash
 cd backend
-npm install
+npm ci
 cp .env.example .env
 ```
 
@@ -41,8 +43,8 @@ npx prisma migrate deploy
 
 預期會套用：
 
-- `init_link`
-- `add_link_note_password_hash`
+- `20260729033313_init_link`
+- `20260729042433_add_link_note_password_hash`
 - `20260729090908_add_link_enabled`
 
 啟動開發伺服器：
@@ -186,7 +188,8 @@ curl -i -X POST http://localhost:3000/api/page-metadata \
 
 ## API 錯誤格式
 
-所有可預期錯誤使用同一外層格式：
+`POST /api/links` 與 `POST /api/page-metadata` 的可預期 JSON 錯誤使用
+同一外層格式：
 
 ```json
 {"error":{"code":"INVALID_SHORT_CODE","message":"..."}}
@@ -195,7 +198,8 @@ curl -i -X POST http://localhost:3000/api/page-metadata \
 建立 API 可能回 `INVALID_URL`、`INVALID_SHORT_CODE`、
 `SHORT_CODE_TAKEN`、`INVALID_NOTE`、`INVALID_PASSWORD` 與
 `INVALID_ENABLED`。非預期伺服器錯誤只回 `500 INTERNAL_ERROR`，不洩漏
-Prisma 或其他內部細節。
+Prisma 或其他內部細節。短碼轉址與密碼解鎖屬於瀏覽器流程；錯誤密碼會回
+HTML 密碼表單，不使用上述 JSON 格式。
 
 ## 執行測試
 
@@ -206,12 +210,6 @@ npm test
 ```
 
 整合測試會使用每次執行專屬的網址，並在結束後刪除本次建立的 Link。
-
-完整驗證：
-
-```bash
-npm test
-```
 
 前端的啟動、測試與同源代理方式請見
 [`../frontend/README.md`](../frontend/README.md)。
