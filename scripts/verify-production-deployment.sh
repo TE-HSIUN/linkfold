@@ -14,6 +14,7 @@ required_files=(
   "frontend/.dockerignore"
   "docker-compose.prod.yml"
   ".env.production.example"
+  "docs/gcp-deployment.md"
 )
 
 for required_file in "${required_files[@]}"; do
@@ -73,10 +74,10 @@ if git check-ignore --quiet .env.production.example; then
   exit 1
 fi
 
-readme_contract=(
+deployment_guide_contract=(
   "cp .env.production.example .env.production"
   "openssl rand -hex 32"
-  "docker compose --env-file .env.production -f docker-compose.prod.yml config"
+  "docker compose --env-file .env.production -f docker-compose.prod.yml config --quiet"
   "docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build"
   "docker compose --env-file .env.production -f docker-compose.prod.yml ps"
   "curl -i http://127.0.0.1/health"
@@ -87,9 +88,9 @@ readme_contract=(
   "目前僅提供 HTTP"
 )
 
-for required_documentation in "${readme_contract[@]}"; do
-  if ! grep -qF "$required_documentation" README.md; then
-    echo "README is missing production operation: $required_documentation" >&2
+for required_documentation in "${deployment_guide_contract[@]}"; do
+  if ! grep -qF "$required_documentation" docs/gcp-deployment.md; then
+    echo "Deployment guide is missing production operation: $required_documentation" >&2
     exit 1
   fi
 done

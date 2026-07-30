@@ -5,6 +5,8 @@ Vue 3、Vite 與 Tailwind CSS 實作的短網址建立頁。頁面位於 `/`，�
 
 ## 本機啟動
 
+本機開發需要 Node.js 22.18 以上與 npm。
+
 先依 [`../backend/README.md`](../backend/README.md) 啟動 PostgreSQL、套用
 Prisma migration，並讓 Express 運行在 `http://localhost:3000`。
 
@@ -26,13 +28,15 @@ npm run dev
 # 專案根目錄
 docker compose up -d
 
-# backend/
+# 進入 backend/
+cd backend
 npm ci
 cp .env.example .env
 npx prisma migrate deploy
 npm run dev
 
-# 另一個終端機，frontend/
+# 另一個終端機，從專案根目錄進入 frontend/
+cd frontend
 npm ci
 npm run dev
 ```
@@ -69,4 +73,6 @@ production 靜態檔至 `frontend/dist/`。
 5. Vue 靜態檔與 `try_files ... /index.html`
 
 若先執行 SPA fallback，短碼 GET 或 unlock 會被 Vue 的 `index.html` 吃掉。
-本 change 只記錄代理契約，不新增正式 Nginx、TLS 或雲端部署設定。
+目前的 [`nginx.conf`](nginx.conf) 已實作上述代理順序，並由根目錄的
+[`docker-compose.prod.yml`](../docker-compose.prod.yml) 部署至 GCP Compute
+Engine。目前只開放 HTTP port 80，尚未設定網域、TLS 與 HTTPS。
