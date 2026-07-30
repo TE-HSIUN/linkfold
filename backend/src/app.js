@@ -1,6 +1,7 @@
 import express from 'express';
 
 import linksRouter from './routes/links.js';
+import pageMetadataRouter from './routes/page-metadata.js';
 import redirectRouter from './routes/redirect.js';
 
 const app = express();
@@ -17,6 +18,7 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/api/links', linksRouter);
+app.use('/api/page-metadata', pageMetadataRouter);
 
 // 萬用短碼路由必須放在所有具名路由之後。
 app.use(redirectRouter);

@@ -13,5 +13,6 @@ model Link {
   originalUrl  String
   note         String?
   passwordHash String?
+  isEnabled    Boolean  @default(true)
   createdAt    DateTime @default(now())
 }

@@ -24,6 +24,8 @@ const PROTECTED_CODE = generateShortCode();
 const PROTECTED_URL = `https://example.com/linkfold-test/${testRunId}/private-target`;
 const PROTECTED_NOTE = '不可出現在密碼頁的備註';
 const PROTECTED_PASSWORD = 'correct-horse';
+const DISABLED_CODE = generateShortCode();
+const DISABLED_PROTECTED_CODE = generateShortCode();
 const UNKNOWN_CODE = generateShortCode();
 
 let protectedPasswordHash;
@@ -40,11 +42,43 @@ function assertPasswordPage(response, expectedStatus) {
     response.text,
     /enctype=["']application\/x-www-form-urlencoded["']/i,
   );
-  assert.match(response.text, /name=["']password["']/);
+  assert.match(
+    response.text,
+    /<input[^>]*name=["']password["'][^>]*autocomplete=["']current-password["'][^>]*required/i,
+  );
   assert.equal(response.text.includes(PROTECTED_NOTE), false);
   assert.equal(response.text.includes(PROTECTED_URL), false);
   assert.equal(response.text.includes(PROTECTED_PASSWORD), false);
   assert.equal(response.text.includes(protectedPasswordHash), false);
+}
+
+function assertBrandedCenteredPasswordPage(response) {
+  assert.match(
+    response.text,
+    /<main[^>]*class=["']page-shell["'][^>]*>/i,
+  );
+  assert.match(
+    response.text,
+    /<section[^>]*class=["']password-card["'][^>]*>/i,
+  );
+  assert.match(
+    response.text,
+    /\.page-shell\s*\{[^}]*min-height:\s*100(?:vh|dvh);[^}]*display:\s*flex;[^}]*align-items:\s*center;[^}]*justify-content:\s*center;/is,
+  );
+  assert.match(response.text, /background-color:\s*#f7faf9;/i);
+  assert.match(
+    response.text,
+    /\.password-card\s*\{[^}]*width:\s*100%;[^}]*max-width:\s*28rem;[^}]*background:\s*#fff;[^}]*border:\s*1px solid #e2e8f0;[^}]*border-radius:\s*2rem;[^}]*box-shadow:/is,
+  );
+  assert.match(response.text, /color:\s*#0f172a;/i);
+  assert.match(
+    response.text,
+    /input:focus\s*\{[^}]*border-color:\s*#14b8a6;[^}]*box-shadow:\s*0 0 0 4px rgba\(20,\s*184,\s*166,\s*0\.1\);/is,
+  );
+  assert.match(
+    response.text,
+    /button\s*\{[^}]*background:\s*#0f172a;[^}]*color:\s*#fff;/is,
+  );
 }
 
 before(async () => {
@@ -67,6 +101,25 @@ before(async () => {
     },
   });
   createdShortCodes.add(PROTECTED_CODE);
+
+  await prisma.link.create({
+    data: {
+      shortCode: DISABLED_CODE,
+      originalUrl: `https://example.com/linkfold-test/${testRunId}/disabled`,
+      isEnabled: false,
+    },
+  });
+  createdShortCodes.add(DISABLED_CODE);
+
+  await prisma.link.create({
+    data: {
+      shortCode: DISABLED_PROTECTED_CODE,
+      originalUrl: `https://example.com/linkfold-test/${testRunId}/disabled-private`,
+      passwordHash: protectedPasswordHash,
+      isEnabled: false,
+    },
+  });
+  createdShortCodes.add(DISABLED_PROTECTED_CODE);
 
   assert.equal(
     await prisma.link.findUnique({ where: { shortCode: UNKNOWN_CODE } }),
@@ -101,6 +154,12 @@ describe('短碼轉址', () => {
       assertPasswordPage(response, 200);
     });
 
+    test('GET 顯示置中且與建立頁一致的密碼卡片', async () => {
+      const response = await request(app).get(`/${PROTECTED_CODE}`);
+
+      assertBrandedCenteredPasswordPage(response);
+    });
+
     test('正確密碼以 302 轉址且不建立 session', async () => {
       const response = await request(app)
         .post(`/${PROTECTED_CODE}/unlock`)
@@ -120,6 +179,11 @@ describe('短碼轉址', () => {
         .send({ password: 'wrong-password' });
 
       assertPasswordPage(response, 401);
+      assertBrandedCenteredPasswordPage(response);
+      assert.match(
+        response.text,
+        /<p[^>]*role=["']alert["'][^>]*>密碼錯誤，請再試一次。<\/p>/i,
+      );
     });
 
     test('缺少密碼回 401 密碼表單', async () => {
@@ -162,6 +226,40 @@ describe('短碼轉址', () => {
 
       assert.equal(response.status, 404);
       assert.equal(response.body.error.code, 'NOT_FOUND');
+    });
+  });
+
+  describe('停用短碼', () => {
+    test('未受保護的 GET 回 404 且不轉址', async () => {
+      const response = await request(app).get(`/${DISABLED_CODE}`);
+
+      assert.equal(response.status, 404);
+      assert.equal(response.body.error.code, 'NOT_FOUND');
+      assert.equal(response.headers.location, undefined);
+    });
+
+    test('受保護的 GET 回 404 且不顯示密碼頁', async () => {
+      const response = await request(app).get(
+        `/${DISABLED_PROTECTED_CODE}`,
+      );
+
+      assert.equal(response.status, 404);
+      assert.equal(response.body.error.code, 'NOT_FOUND');
+      assert.doesNotMatch(
+        response.text,
+        /此短網址需要密碼/,
+      );
+    });
+
+    test('受保護的 unlock 回 404 且不轉址', async () => {
+      const response = await request(app)
+        .post(`/${DISABLED_PROTECTED_CODE}/unlock`)
+        .type('form')
+        .send({ password: PROTECTED_PASSWORD });
+
+      assert.equal(response.status, 404);
+      assert.equal(response.body.error.code, 'NOT_FOUND');
+      assert.equal(response.headers.location, undefined);
     });
   });
 

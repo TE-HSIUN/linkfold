@@ -21,6 +21,7 @@ const testRunId = randomUUID();
 const createdShortCodes = new Set();
 const SUCCESS_RESPONSE_FIELDS = [
   'createdAt',
+  'enabled',
   'note',
   'originalUrl',
   'passwordProtected',
@@ -56,7 +57,11 @@ function assertSuccessfulResponse(response, expected) {
   assert.equal(response.status, 201);
   createdShortCodes.add(response.body.shortCode);
   assert.deepEqual(Object.keys(response.body).sort(), SUCCESS_RESPONSE_FIELDS);
-  assert.match(response.body.shortCode, /^[0-9A-Za-z]{7}$/);
+  if (expected.shortCode) {
+    assert.equal(response.body.shortCode, expected.shortCode);
+  } else {
+    assert.match(response.body.shortCode, /^[0-9A-Za-z]{7}$/);
+  }
   assert.equal(
     response.body.shortUrl,
     `${process.env.BASE_URL}/${response.body.shortCode}`,
@@ -67,6 +72,7 @@ function assertSuccessfulResponse(response, expected) {
     response.body.passwordProtected,
     expected.passwordProtected,
   );
+  assert.equal(response.body.enabled, expected.enabled ?? true);
   assert.equal(
     new Date(response.body.createdAt).toISOString(),
     response.body.createdAt,
@@ -150,6 +156,31 @@ describe('POST /api/links', () => {
       firstResponse.body.shortCode,
       secondResponse.body.shortCode,
     );
+  });
+
+  test('接受自訂短碼並保存停用狀態', async () => {
+    const originalUrl = testUrl('custom-disabled');
+    const shortCode = `draft-${testRunId.replaceAll('-', '').slice(0, 12)}`;
+    const response = await request(app).post('/api/links').send({
+      originalUrl,
+      shortCode,
+      enabled: false,
+    });
+
+    assertSuccessfulResponse(response, {
+      originalUrl,
+      shortCode,
+      note: null,
+      passwordProtected: false,
+      enabled: false,
+    });
+
+    const storedLink = await prisma.link.findUnique({
+      where: { shortCode },
+    });
+
+    assert.equal(storedLink.shortCode, shortCode);
+    assert.equal(storedLink.isEnabled, false);
   });
 
   describe('originalUrl 驗證', () => {
@@ -286,6 +317,102 @@ describe('POST /api/links', () => {
         'INVALID_PASSWORD',
       );
     });
+  });
+
+  describe('自訂短碼驗證', () => {
+    const validCodes = [
+      'a1-b',
+      `a${'b'.repeat(30)}z`,
+      'project-docs-2026',
+    ];
+
+    for (const shortCode of validCodes) {
+      test(`接受 ${shortCode}`, async () => {
+        const response = await request(app).post('/api/links').send({
+          originalUrl: testUrl(`valid-custom-${shortCode}`),
+          shortCode,
+        });
+
+        assertSuccessfulResponse(response, {
+          originalUrl: testUrl(`valid-custom-${shortCode}`),
+          shortCode,
+          note: null,
+          passwordProtected: false,
+        });
+      });
+    }
+
+    const invalidCodes = [
+      'abc',
+      'a'.repeat(33),
+      'Project-docs',
+      'project_docs',
+      'project docs',
+      '-project',
+      'project-',
+      'health',
+      42,
+      null,
+    ];
+
+    for (const shortCode of invalidCodes) {
+      test(`拒絕 ${JSON.stringify(shortCode)}`, async () => {
+        await assertRejectedWithoutWrite(
+          {
+            originalUrl: testUrl('invalid-custom-code'),
+            shortCode,
+          },
+          'INVALID_SHORT_CODE',
+        );
+      });
+    }
+  });
+
+  describe('enabled 驗證', () => {
+    for (const enabled of ['false', 0, null]) {
+      test(`拒絕 ${JSON.stringify(enabled)}`, async () => {
+        await assertRejectedWithoutWrite(
+          {
+            originalUrl: testUrl('invalid-enabled'),
+            enabled,
+          },
+          'INVALID_ENABLED',
+        );
+      });
+    }
+  });
+
+  test('自訂短碼衝突時回 SHORT_CODE_TAKEN 且不重試', async () => {
+    let createAttempts = 0;
+    let generatorCalls = 0;
+    const prismaClient = {
+      link: {
+        async create() {
+          createAttempts += 1;
+          throw Object.assign(new Error('Unique constraint failed'), {
+            code: 'P2002',
+          });
+        },
+      },
+    };
+    const router = createLinksRouter({
+      prismaClient,
+      codeGenerator: () => {
+        generatorCalls += 1;
+        return 'AAAAAAA';
+      },
+    });
+    const response = await request(createInjectedApp(router))
+      .post('/api/links')
+      .send({
+        originalUrl: testUrl('custom-collision'),
+        shortCode: 'project-docs',
+      });
+
+    assert.equal(response.status, 409);
+    assert.equal(response.body.error.code, 'SHORT_CODE_TAKEN');
+    assert.equal(createAttempts, 1);
+    assert.equal(generatorCalls, 0);
   });
 
   describe('短碼碰撞重試', () => {

@@ -1,3 +1,5 @@
+import 'dotenv/config';
+
 import app from './src/app.js';
 
 // 只負責啟動 server。app 本身定義在 src/app.js，
