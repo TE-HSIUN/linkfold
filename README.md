@@ -128,21 +128,125 @@ npm run build
 - [後端說明](backend/README.md)
 - [前端說明](frontend/README.md)
 
-## 部署規劃
+## GCP VM 部署
 
-預計使用以下架構部署：
+Production 架構在單台 Compute Engine VM 上執行三個容器：
 
-- **Google Cloud Platform（GCP）**：雲端平台
-- **Compute Engine**：建立雲端虛擬伺服器
-- **Ubuntu 24.04 LTS**：伺服器作業系統
-- **Docker**：將應用程式與服務容器化
-- **Docker Compose**：管理前端、後端、PostgreSQL 與 Nginx 容器
-- **Nginx**：提供前端靜態檔案、反向代理 API，並處理網域與 HTTPS
+- `web`：Nginx 提供 Vue 靜態檔並反向代理動態請求。
+- `backend`：Express API、短碼轉址與 Prisma migration。
+- `db`：PostgreSQL 15，資料保存在 Docker named volume。
 
-正式環境應由同一個公開 origin 提供 Vue 靜態檔與 Express 服務。Nginx
-必須先將 `/api/`、`/health`、`/:code/unlock` 與短碼 `/:code` 交給
-Express，最後才套用 Vue SPA fallback。
+只有 Nginx 的 port 80 會對主機公開；PostgreSQL 5432 與 Express 3000
+只存在於 Compose 內部網路。目前僅提供 HTTP，尚未設定網域與 HTTPS，
+因此不應在正式公開宣傳前傳輸敏感資料。
 
-目前 repository 尚未包含正式環境所需的前端、後端與 Nginx Dockerfile、
-完整 production Compose、Nginx 設定及 TLS 設定；現有
-`docker-compose.yml` 僅供本機啟動 PostgreSQL。
+### 環境需求
+
+VM 需先安裝 Git、Docker Engine 與 Docker Compose v2，並允許 HTTP
+流量。第一次部署時下載 repository：
+
+```bash
+git clone https://github.com/TE-HSIUN/linkfold.git
+cd linkfold
+```
+
+### 1. 建立正式環境設定
+
+複製可提交的範本；實際 `.env.production` 已被 Git 忽略：
+
+```bash
+cp .env.production.example .env.production
+```
+
+產生 32 bytes、只含十六進位字元的隨機資料庫密碼：
+
+```bash
+openssl rand -hex 32
+```
+
+使用文字編輯器開啟 `.env.production`，將輸出貼到
+`POSTGRES_PASSWORD=` 後方。首次 GCP 部署的 `BASE_URL` 為：
+
+```dotenv
+BASE_URL=http://34.122.24.161
+```
+
+不要提交 `.env.production`，也不要將密碼貼到 issue、PR 或聊天訊息。
+
+### 2. 檢查並啟動服務
+
+先解析 Compose，確認必要變數與設定有效；這一步不會啟動容器：
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml config
+```
+
+建置 images，並在背景啟動 PostgreSQL、Express 與 Nginx：
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+```
+
+Backend 啟動時會先執行 `prisma generate` 與 `prisma migrate deploy`，
+成功後才啟動 Express。
+
+### 3. 驗證部署
+
+查看三個服務的狀態：
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml ps
+```
+
+在 VM 內檢查經過 Nginx 代理的健康端點與首頁：
+
+```bash
+curl -i http://127.0.0.1/health
+curl -I http://127.0.0.1/
+```
+
+健康端點應回 HTTP 200 與 `{"status":"ok"}`。接著可從瀏覽器開啟
+`http://34.122.24.161/`。
+
+若服務未正常啟動，查看最近 100 行 logs：
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml logs --tail=100
+```
+
+持續追蹤 logs 時加上 `--follow`，按 `Ctrl+C` 只會停止追蹤，不會停止
+容器：
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml logs --follow --tail=100
+```
+
+### 更新部署
+
+取得目前 branch 的最新程式碼：
+
+```bash
+git pull --ff-only
+```
+
+重新建置並套用更新；PostgreSQL named volume 會保留：
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+```
+
+更新後再次執行 `ps`、健康檢查與首頁檢查。
+
+### 停止與復原
+
+停止並移除容器與網路，但保留 PostgreSQL named volume：
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml down
+```
+
+再次執行 `up -d --build` 即可使用原有資料重新啟動。
+
+> 請勿執行 `docker compose down -v` 或在上述指令加入 `down -v`。
+> `-v` 會刪除 PostgreSQL named volume，可能造成所有短網址資料永久遺失；
+> 只有在明確要清空資料且已確認備份時才能使用。
