@@ -9,4 +9,4 @@
 ## 3. 回歸與正式環境驗收
 
 - [x] 3.1 確認修正未改變結果卡其他行為、公開 API 或 production build；依序執行 `cd frontend && npm test`、`npm run lint`、`npm run build`，三項皆須以 exit code 0 完成。
-- [ ] 3.2 使用既有 GCE 更新流程部署新的 frontend image 後，在目前公開 HTTP 網址建立一筆測試短網址，按一次「複製短網址」並貼入純文字欄位；貼上的內容必須與結果卡顯示的完整短網址逐字一致，且 live region 顯示「短網址已複製」。不變更 Compose、Nginx、`BASE_URL`、後端或資料庫設定。
+- [x] 3.2 使用既有 GCE 更新流程部署新的 frontend image 後，在目前公開 HTTP 網址建立一筆測試短網址，按一次「複製短網址」並貼入純文字欄位；貼上的內容必須與結果卡顯示的完整短網址逐字一致，且 live region 顯示「短網址已複製」。不變更 Compose、Nginx、`BASE_URL`、後端或資料庫設定。

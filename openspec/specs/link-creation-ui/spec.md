@@ -163,7 +163,7 @@ tests:
 ---
 ### Requirement: Present creation progress and result
 
-The frontend SHALL prevent duplicate creation requests while `POST /api/links` is pending. After a successful response, it SHALL display the short URL, original URL, password-protected state, enabled state, and actions to copy the short URL and create another link. It SHALL display an open-link action only when the result is enabled. Copy feedback and request status MUST be exposed through an ARIA live region.
+The frontend SHALL prevent duplicate creation requests while `POST /api/links` is pending. After a successful response, it SHALL display the short URL, original URL, password-protected state, enabled state, and actions to copy the short URL and create another link. It SHALL display an open-link action only when the result is enabled. The copy action MUST first use the Clipboard API when available. When the Clipboard API is unavailable or rejects the write, the copy action MUST select the complete displayed short URL and attempt a synchronous browser copy fallback within the same user action. The frontend SHALL report success when either copy path succeeds. It SHALL retain the complete text selection and report a manual-copy instruction only when both paths fail. Copy feedback and request status MUST be exposed through an ARIA live region.
 
 #### Scenario: Enabled link is created
 
@@ -180,39 +180,34 @@ The frontend SHALL prevent duplicate creation requests while `POST /api/links` i
 - **WHEN** a creation request is pending and the user activates the submit action again
 - **THEN** the frontend sends no additional creation request and keeps the pending state visible
 
+#### Scenario: Clipboard API copies the short URL
+
+- **WHEN** the user activates the copy action and the Clipboard API successfully writes the displayed short URL
+- **THEN** the fallback is not invoked and the live region reports that the short URL was copied
+
+#### Scenario: Insecure origin uses the copy fallback
+
+- **WHEN** the user activates the copy action on an origin where the Clipboard API is unavailable
+- **THEN** the frontend selects the complete displayed short URL, invokes the synchronous copy fallback, and reports success when the fallback succeeds
+
+#### Scenario: Clipboard rejection uses the copy fallback
+
+- **WHEN** the user activates the copy action and the Clipboard API rejects the write
+- **THEN** the frontend attempts the synchronous copy fallback and reports success when the fallback succeeds
+
+#### Scenario: Every automatic copy path fails
+
+- **WHEN** the Clipboard API is unavailable or rejects the write and the synchronous copy fallback returns failure or throws an error
+- **THEN** the frontend keeps the complete displayed short URL selected and the live region instructs the user to copy it manually
+
 
 <!-- @trace
-source: add-link-creation-web-ui
-updated: 2026-07-30
+source: fix-production-short-url-copy
+updated: 2026-07-31
 code:
-  - frontend/src/style.css
-  - frontend/src/App.vue
-  - backend/src/routes/redirect.js
-  - backend/src/routes/links.js
-  - backend/src/routes/page-metadata.js
-  - backend/prisma/migrations/20260729090908_add_link_enabled/migration.sql
-  - backend/README.md
-  - frontend/src/router/index.js
-  - frontend/index.html
-  - frontend/eslint.config.js
-  - backend/index.js
-  - frontend/src/services/api.js
-  - backend/src/lib/page-metadata.js
-  - frontend/src/components/LinkCreationForm.vue
   - frontend/src/components/LinkResultCard.vue
-  - backend/src/app.js
-  - frontend/src/main.js
-  - frontend/package.json
-  - frontend/README.md
-  - frontend/src/views/CreateLinkView.vue
-  - backend/package.json
-  - frontend/vite.config.js
-  - backend/prisma/schema.prisma
 tests:
-  - backend/test/page-metadata.test.js
   - frontend/src/__tests__/CreateLinkView.test.js
-  - backend/test/links.test.js
-  - backend/test/redirect.test.js
 -->
 
 ---
