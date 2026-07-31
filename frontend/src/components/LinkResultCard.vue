@@ -1,5 +1,5 @@
 <script setup>
-import { nextTick, ref } from 'vue';
+import { ref } from 'vue';
 
 defineProps({
   result: {
@@ -14,19 +14,33 @@ const shortUrlInput = ref(null);
 const copyMessage = ref('短網址已建立。');
 
 async function copyShortUrl(result) {
-  try {
-    if (!navigator.clipboard?.writeText) {
-      throw new Error('Clipboard API unavailable');
-    }
+  let copied = false;
 
-    await navigator.clipboard.writeText(result.shortUrl);
-    copyMessage.value = '短網址已複製。';
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(result.shortUrl);
+      copied = true;
+    }
   } catch {
-    copyMessage.value =
-      '複製失敗，請選取上方短網址後手動複製。';
-    await nextTick();
-    shortUrlInput.value?.select();
+    copied = false;
   }
+
+  if (!copied) {
+    shortUrlInput.value?.select();
+
+    try {
+      copied = Boolean(
+        shortUrlInput.value &&
+          document.execCommand('copy'),
+      );
+    } catch {
+      copied = false;
+    }
+  }
+
+  copyMessage.value = copied
+    ? '短網址已複製。'
+    : '複製失敗，請選取上方短網址後手動複製。';
 }
 </script>
 

@@ -43,11 +43,16 @@ describe('CreateLinkView 表單', () => {
       title: '',
       description: '',
     });
+    Object.defineProperty(document, 'execCommand', {
+      configurable: true,
+      value: vi.fn(),
+    });
   });
 
   afterEach(() => {
     vi.clearAllMocks();
     delete navigator.clipboard;
+    delete document.execCommand;
     document.body.innerHTML = '';
   });
 
@@ -439,18 +444,14 @@ describe('CreateLinkView 表單', () => {
     await flushPromises();
 
     expect(writeText).toHaveBeenCalledWith(SUCCESS_RESULT.shortUrl);
+    expect(document.execCommand).not.toHaveBeenCalled();
     expect(wrapper.get('[data-testid="result-live"]').text()).toContain(
       '已複製',
     );
   });
 
-  it('Clipboard 失敗時保留可選取短網址並顯示 fallback', async () => {
-    Object.defineProperty(navigator, 'clipboard', {
-      configurable: true,
-      value: {
-        writeText: vi.fn().mockRejectedValue(new Error('denied')),
-      },
-    });
+  it('Clipboard API 不存在時使用 fallback 複製完整短網址', async () => {
+    document.execCommand.mockReturnValue(true);
     const wrapper = mountView();
 
     await enterValidUrl(wrapper);
@@ -458,8 +459,64 @@ describe('CreateLinkView 表單', () => {
     await wrapper.get('button[data-action="copy"]').trigger('click');
     await flushPromises();
 
-    expect(wrapper.get('[data-testid="short-url"]').element.value).toBe(
-      SUCCESS_RESULT.shortUrl,
+    const shortUrlInput = wrapper.get(
+      '[data-testid="short-url"]',
+    ).element;
+    expect(document.execCommand).toHaveBeenCalledWith('copy');
+    expect(shortUrlInput.selectionStart).toBe(0);
+    expect(shortUrlInput.selectionEnd).toBe(
+      SUCCESS_RESULT.shortUrl.length,
+    );
+    expect(wrapper.get('[data-testid="result-live"]').text()).toContain(
+      '已複製',
+    );
+  });
+
+  it('Clipboard 拒絕時改用 fallback 複製完整短網址', async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error('denied'));
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    document.execCommand.mockReturnValue(true);
+    const wrapper = mountView();
+
+    await enterValidUrl(wrapper);
+    await submit(wrapper);
+    await wrapper.get('button[data-action="copy"]').trigger('click');
+    await flushPromises();
+
+    expect(writeText).toHaveBeenCalledWith(SUCCESS_RESULT.shortUrl);
+    expect(document.execCommand).toHaveBeenCalledWith('copy');
+    expect(wrapper.get('[data-testid="result-live"]').text()).toContain(
+      '已複製',
+    );
+  });
+
+  it.each([
+    ['回傳 false', () => false],
+    [
+      '拋出錯誤',
+      () => {
+        throw new Error('copy unavailable');
+      },
+    ],
+  ])('fallback %s 時保留完整選取並提示手動複製', async (_, fallback) => {
+    document.execCommand.mockImplementation(fallback);
+    const wrapper = mountView();
+
+    await enterValidUrl(wrapper);
+    await submit(wrapper);
+    await wrapper.get('button[data-action="copy"]').trigger('click');
+    await flushPromises();
+
+    const shortUrlInput = wrapper.get(
+      '[data-testid="short-url"]',
+    ).element;
+    expect(shortUrlInput.value).toBe(SUCCESS_RESULT.shortUrl);
+    expect(shortUrlInput.selectionStart).toBe(0);
+    expect(shortUrlInput.selectionEnd).toBe(
+      SUCCESS_RESULT.shortUrl.length,
     );
     expect(wrapper.get('[data-testid="result-live"]').text()).toContain(
       '複製失敗',
